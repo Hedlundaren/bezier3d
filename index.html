@@ -1,0 +1,174 @@
+<html>
+	<head>
+		<title>Bezier</title>
+    <meta charset="utf-8">
+      <!--<link rel="icon" href="blomma2.ico" type="image/x-icon" />-->
+      <link rel="stylesheet" href="style/style.css">
+	</head>
+	<body onload="onWindowResize()">
+		<div id="container">
+		</div>
+	</body>
+
+	//***** EXTERNAL INCLUDES *****//
+	 <script src="js/external/three.min.js"></script>
+	 <script src="js/external/OrbitControls.js"></script>
+   <script src="js/external/EventsControls.js"></script>
+
+	 <script src="js/include/functions.js"></script>
+
+
+
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+
+
+
+	<script type="x-shader/x-vertex" id="vertexShader">
+uniform float time;
+uniform vec3 control_points[ 4 ];
+varying vec3 newPos;
+
+
+
+	void main() {
+
+		float t = position.x;
+		vec3 newPosition = pow(( 1.0 - t ), 3.0) * control_points[0] +
+		3.0*pow(( 1.0 - t ), 2.0) * t * control_points[1] +
+		3.0*( 1.0 - t ) * 	pow(t, 2.0) * control_points[2] +
+		pow(t, 3.0) * control_points[3];
+
+    gl_Position = projectionMatrix *
+                  modelViewMatrix *
+                  vec4(newPosition ,1.0);
+
+		if(position.x < 0.0){
+			gl_Position = vec4(0.0,0.0,0.0 ,1.0);
+		}
+		newPos = position;
+  }
+	</script>
+
+	<script type="x-shader/x-fragment" id="fragmentShader">
+	//it looks like we need to turn on high precision floats every time.
+	#ifdef GL_ES
+	precision highp float;
+	#endif
+
+	varying vec3 newPos;
+
+	void main() {
+		gl_FragColor = vec4(1.0, //R
+							0.0, //G
+							1.0, //B
+							1.0); //A
+		if(newPos.x < 0.0){
+			gl_FragColor = vec4(0.0,0.0,0.0 ,1.0);
+		}
+
+	}
+	</script>
+
+
+  <script type="text/javascript" src="js/include/setup.js" ></script>
+
+	<script type="text/javascript">
+		var shaderMaterial;
+		var mesh;
+		var clock = new THREE.Clock();
+
+		var controls = new THREE.OrbitControls( camera, renderer.domElement );
+	  controls.enableDamping = true;
+	  controls.dampingFactor = 0.25;
+		controls.enableZoom = true;
+	  controls.enablePan = false;
+	  controls.zoomSpeed = 0.9;
+	  controls.panSpeed = 0;
+	  controls.rotateSpeed = 0.1;
+
+		var moving_control_point = false;
+		var drag_start = new THREE.Vector2(0.0, 0.0);
+		var drag_current = new THREE.Vector2(0.0, 0.0);
+		var current_mesh = new THREE.Object3D();
+		current_mesh.position = new THREE.Vector3(0,0,0);
+
+		var EventsControls = new EventsControls( camera, renderer.domElement );
+		EventsControls.attachEvent( 'onclick', function() {
+			moving_control_point = true;
+			controls.enableRotate = false;
+			current_mesh = this.focused;
+		});
+
+		EventsControls.attachEvent( 'mouseOver', function() {
+			this.mouseOvered.material.color = new THREE.Color("rgb(200, 200, 200)");
+		  this.mouseOvered.scale.set(1.2,1.2,1.2);
+
+		});
+		EventsControls.attachEvent( 'mouseOut', function() {
+		  this.mouseOvered.material.color = new THREE.Color("rgb(150, 150, 150)");
+			this.mouseOvered.scale.set(1,1,1);
+
+		});
+
+
+		var NUMBER_OF_CONTROL_POINTS = 4;
+		var control_points = [];
+
+		for(var cp_index = 0; cp_index < NUMBER_OF_CONTROL_POINTS; cp_index++){
+
+				var size = 0.1;
+				var geometry = new THREE.BoxGeometry( size, size, size );
+				var material = new THREE.MeshBasicMaterial( {color: 0x888888} );
+				var cube = new THREE.Mesh( geometry, material );
+				control_points[cp_index] = new THREE.Object3D();
+				control_points[cp_index].mesh = cube;
+				control_points[cp_index].mesh.name = cp_index;
+				control_points[cp_index].position.x = cp_index * 0.33;
+				control_points[cp_index].position.y = 0;
+				control_points[cp_index].position.z =  0;
+				control_points[cp_index].mesh.position.x = control_points[cp_index].position.x;
+				control_points[cp_index].mesh.position.y = control_points[cp_index].position.y;
+				control_points[cp_index].mesh.position.z = control_points[cp_index].position.z;
+				scene.add( control_points[cp_index].mesh );
+				EventsControls.attach( control_points[cp_index].mesh );
+
+		}
+
+		var uniforms = {
+
+			fogColor:   { value: new THREE.Vector3( 0, 0, 0 ) },
+			time:       { value: 1.0 },
+			control_points : { type: "v3v", value: [ new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+
+		};
+
+
+
+	loadMesh();
+
+
+
+		//--------- RENDER LOOP ---------//
+		(function animloop(){
+	  		requestAnimFrame(animloop);
+
+				camera.updateMatrixWorld();
+			//	console.log(camera.getWorldDirection( new THREE.Vector3(0,1,0) ) );
+			var v0 = ( new THREE.Vector3( control_points[0].position.x, control_points[0].position.z, -control_points[0].position.y ));
+			var v1 = ( new THREE.Vector3( control_points[1].position.x, control_points[1].position.z, -control_points[1].position.y ));
+			var v2 = ( new THREE.Vector3( control_points[2].position.x, control_points[2].position.z, -control_points[2].position.y ));
+			var v3 = ( new THREE.Vector3( control_points[3].position.x, control_points[3].position.z, -control_points[3].position.y ));
+
+				var delta = 5 * clock.getDelta();
+				uniforms.time.value += 0.2 * delta;
+				uniforms.control_points.value = [ v0,v1,v2,v3 ];
+				uniforms.time.value += 0.2 * delta;
+	  		//render();
+	  		renderer.render(scene, camera);
+		})();
+	</script>
+
+	<script src="js/include/eventListeners.js"></script>
+
+
+</html>
